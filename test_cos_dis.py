@@ -195,3 +195,15 @@ with tf.Session() as sess:
   print("loss:", loss)
   #print("losses:",losses)
   #print("radial_diffs:",radial_diffs)
+
+with tf.Session() as sess:
+ 
+  dis = sess.run(tf.square(x3-x4))
+ 
+  dis1 = sess.run(tf.reduce_sum(tf.square(x3-x4), 1))
+ 
+  euclidean = sess.run(tf.sqrt(tf.reduce_sum(tf.square(x3-x4), 1)))
+  euclidean = np.sum(euclidean)
+  print("dis:",dis)
+  print("dis1:",dis1)
+  print (euclidean)
