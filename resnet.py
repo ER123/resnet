@@ -28,6 +28,94 @@ tf.app.flags.DEFINE_integer('input_size', 96, "input image size")
 
 activation = tf.nn.relu
 
+def LCNN4(x):
+
+    c = Config()
+    c['ksize'] = 3
+    c['stride'] = 1
+    c['fc_units_out'] = 256
+    c['conv_filters_out'] = 64
+
+    print("input.shape:", x.get_shape())
+
+    with tf.variable_scope("conv1"):
+        c['conv_filters_out'] = 48
+        c['ksize'] = 5
+        x = conv(x,c)
+        x = activation(x)
+    print("conv1.shape:",x.get_shape())
+
+    with tf.variable_scope("max_pool1"):
+        x = _max_pool(x, ksize=2, stride=2)
+    print("max_pool1.shape:",x.get_shape())
+
+    with tf.variable_scope("conv2"):
+        c['ksize'] = 1
+        c['conv_filters_out'] = 48
+        x = conv(x, c)
+        x = activation(x)
+    print("conv2.shape:",x.get_shape())
+
+    with tf.variable_scope("conv3"):
+        c['ksize'] = 3
+        c['conv_filters_out'] = 96
+        x = conv(x, c)
+        x = activation(x)
+    print("conv3.shape:",x.get_shape())
+
+    with tf.variable_scope("max_pool2"):
+        x = _max_pool(x, ksize=2, stride=2)
+    print("max_pool2.shape:",x.get_shape())
+
+    with tf.variable_scope("conv4"):
+        c['ksize'] = 1
+        c['conv_filters_out'] = 96
+        x = conv(x, c)
+        x = activation(x)
+    print("conv4.shape:",x.get_shape())
+
+    with tf.variable_scope("conv5"):
+        c['ksize'] = 3
+        c['conv_filters_out'] = 128
+        x = conv(x, c)
+        x = activation(x)
+    print("conv5.shape:",x.get_shape())
+
+    with tf.variable_scope("conv6"):
+        c['ksize'] = 1
+        c['conv_filters_out'] = 128
+        x = conv(x, c)
+        x = activation(x)
+    print("conv6.shape:",x.get_shape())
+
+    with tf.variable_scope("conv7"):
+        c['ksize'] = 3
+        c['conv_filters_out'] = 128
+        x = conv(x, c)
+        x = activation(x)
+    print("conv7.shape:",x.get_shape())
+
+    with tf.variable_scope("max_pool3"):
+        x = _max_pool(x, ksize=2, stride=2)
+    print("max_pool3.shape:",x.get_shape())
+
+    x = slim.flatten(x)
+
+    with tf.variable_scope("fc1"):
+        c['fc_units_out'] = 512
+        x = fc(x, c)
+    print("fc1.shape:",x.get_shape())
+
+    x = tf.nn.dropout(x, keep_prob=0.5)
+
+    with tf.variable_scope("fc2"):
+    	c['fc_units_out'] = 256
+    	x = fc(x, c)
+    print("fc2.shape:",x.get_shape())
+
+    return x
+
+
 def conv_layers(x, labels, is_training, use_bias=False):
 	c = Config()
 	c['is_training'] = tf.convert_to_tensor(is_training, dtype='bool', name='is_training')
