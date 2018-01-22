@@ -97,8 +97,8 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	label = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 256], name="label")
 	is_training = tf.placeholder('bool',[], name='is_training')
 
-	output_op = net(input_image, label, is_training=is_training)
-
+	#output_op = test_net(input_image, label, is_training=is_training)
+	output_op = LCNN4(input_image)
 	loss_op = cos_loss(output_op, label)
 
 	train_op, lr_op = train_model(base_lr, loss_op, num)
