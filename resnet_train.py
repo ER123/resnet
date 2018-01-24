@@ -89,6 +89,15 @@ def dis_loss(logits, labels):
 	loss = tf.sqrt(tf.reduce_sum(tf.square(logits-labels), 1))
 	return loss
 
+def norm_loss(output, labels):
+	output_norm = tf.sqrt(tf.reduce_sum(tf.square(output), axis=1))
+    	label_norm = tf.sqrt(tf.reduce_sum(tf.square(label), axis=1))
+    
+   	label_output = tf.reduce_sum(tf.multiply(output, label), axis=1)
+    	loss = 1 - tf.reduce_mean(  label_output / tf.multiply( label_norm, output_norm) )
+    
+    	return loss
+
 def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 
 	image_batch, label_batch = load_data(tfrecord_file, config.BATCH_SIZE)
@@ -99,8 +108,8 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 
 	#output_op = test_net(input_image, label, is_training=is_training)
 	output_op = LCNN4(input_image)
-	loss_op = cos_loss(output_op, label)
-
+	#loss_op = cos_loss(output_op, label)
+ 	
 	train_op, lr_op = train_model(base_lr, loss_op, num)
 
 	init = tf.global_variables_initializer()
@@ -168,14 +177,4 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	finally:
 		coord.request_stop()
 		writer.close()
-	coord.join(threads)
-	sess.close()
-
-if __name__ == '__main__':
-	tfrecord_file = "G:\\ready_for_tfrecord\\train.tfrecord_shuffle"
-	image_size = 96
-	base_lr = 0.01
-	num = 30000
-	end_epoch = 20
-	net = test_net
-	train( net, tfrecord_file, image_size, base_lr, num, end_epoch)
+	coord.join(
