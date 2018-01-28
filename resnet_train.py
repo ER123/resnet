@@ -17,13 +17,13 @@ from easydict import EasyDict as edict
 #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 config = edict()
-config.BATCH_SIZE = 64
-config.LR_EPOCH = 30
+config.BATCH_SIZE = 16
+config.LR_EPOCH = 100
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
-f1 = open("C:/Users/salaslyrin/Desktop/ResNet/_MYRESNET/output_onet.txt", 'w')
-f2 = open("C:/Users/salaslyrin/Desktop/ResNet/_MYRESNET/labels_onet.txt", 'w')
+f1 = open("E:/ExtractionNet/output_onet_norm0.txt", 'w')
+f2 = open("E:/ExtractionNet/labels_onet_norm0.txt", 'w')
 
 def load_data(tfrecord_file, batch_size):
 	#every epoch shuffle
@@ -36,7 +36,7 @@ def load_data(tfrecord_file, batch_size):
 		features={
 			"image":tf.FixedLenFeature([], tf.string),
 			#"label":tf.FixedLenFeature([256], tf.float32),
-			"label":tf.FixedLenFeature([256], tf.float32),
+			"label":tf.FixedLenFeature([1024], tf.float32),
 		}
 	)
 	#print("image_features:",image_features)
@@ -68,7 +68,7 @@ def train_model(base_lr, loss, data_num):
 	lr_factor = 0.1
 	global_step = tf.Variable(0, trainable=False)
 
-	boundaries = [int(40*epoch*data_num/config.BATCH_SIZE) for epoch in range(1,6)]
+	boundaries = [int(10*epoch*data_num/config.BATCH_SIZE) for epoch in range(1,6)]
 	print("boundaries:",boundaries)
 	lr_values = [base_lr*(lr_factor ** x) for x in range(6)]
 	print("lr_values:",lr_values)
@@ -78,6 +78,7 @@ def train_model(base_lr, loss, data_num):
 	train_op = optimizer.minimize(loss, global_step)
 
 	return train_op, lr_op
+
 
 def cos_loss(output, labels):
 	output = tf.nn.l2_normalize(output, 1)
@@ -94,7 +95,7 @@ def dis_loss(output, labels):
 	print("sum(loss):",loss)
 	return loss
 
-def loss_norm(output, label):
+def norm_loss(output, label):
     output_norm = tf.sqrt(tf.reduce_sum(tf.square(output), axis=1))
     label_norm = tf.sqrt(tf.reduce_sum(tf.square(label), axis=1))
     
@@ -108,7 +109,7 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	image_batch, label_batch = load_data(tfrecord_file, config.BATCH_SIZE)
 
 	input_image = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 96, 96, 3], name="input_image")
-	label = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 256], name="label")
+	label = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 1024], name="label")
 	#label = tf.placeholder(tf.float32, shape=[config.BATCH_SIZE, 4], name="label")
 	is_training = tf.placeholder('bool',[], name='is_training')
 
@@ -117,10 +118,16 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	output_op = O_net(input_image)
 
 	#loss_op = cos_loss(output_op, label)
-	loss_op = loss_norm(output_op, label)
+	loss_op = norm_loss(output_op, label)
 	#loss_op = dis_loss(output_op, label)
 
-	train_op, lr_op = train_model(base_lr, loss_op, num)
+	#train_op, lr_op = train_model(base_lr, loss_op, num)
+
+	global_ = tf.Variable(tf.constant(0))
+	lr_op = tf.train.exponential_decay(0.06, global_, 1, 0.8, staircase=True)
+
+	regularization_losses = tf.add_n(tf.losses.get_regularization_losses())
+	train_op = tf.train.AdamOptimizer(lr_op).minimize( (loss_op + 0.001*regularization_losses) )
 
 	init = tf.global_variables_initializer()
 
@@ -138,7 +145,7 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	tf.summary.scalar("loss", loss_op)
 	summary_op = tf.summary.merge_all()
 
-	logs_dir = "C:/Users/salaslyrin/Desktop/ResNet/_MYRESNET/logs/onet"
+	logs_dir = "E:/ExtractionNet/logs/onet1024_1"
 	if os.path.exists(logs_dir) == False:
 		os.mkdir(logs_dir)
 
@@ -160,13 +167,13 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 			image_batch_array, label_batch_array = sess.run([image_batch, label_batch])
 
 			#print("label_batch_array:",label_batch_array[0])
-			_, _, summary = sess.run([train_op, lr_op, summary_op], feed_dict={input_image: image_batch_array, label:label_batch_array})
+			_, _, summary = sess.run([train_op, lr_op, summary_op], feed_dict={input_image: image_batch_array, label:label_batch_array, global_:epoch})
 			#sess.run([train_op, lr_op], feed_dict={input_image: image_batch_array, label:label_batch_array})
-			if (step+1) % 100 == 0:
-				output, loss, lr = sess.run([output_op, loss_op, lr_op], feed_dict={input_image: image_batch_array, label:label_batch_array})
+			if (step+1) % 10 == 0:
+				output, loss, lr = sess.run([output_op, loss_op, lr_op], feed_dict={input_image: image_batch_array, label:label_batch_array, global_:epoch})
 				
-				if (step+1) %1000 == 0:
-					output, loss = sess.run([output_op, loss_op], feed_dict={input_image: image_batch_array, label:label_batch_array})
+				if (step+1) %100 == 0:
+					output, loss = sess.run([output_op, loss_op], feed_dict={input_image: image_batch_array, label:label_batch_array, global_:epoch})
 					print("output:",output[0])					
 					for out, label_ in zip(output, label_batch_array):
 						for res1, res2 in zip(out, label_):
@@ -175,10 +182,11 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 						f1.write("\n")
 						f2.write("\n")
 				print("%s : step: %d, loss: %2f, lr: %6f"%(datetime.now(), step+1, loss, lr))
-			if i*config.BATCH_SIZE >= 8*num:
+			if i*config.BATCH_SIZE >= num:
 				epoch = epoch + 1
 				i = 0
-				saver.save(sess, "C:/Users/salaslyrin/Desktop/ResNet/_MYRESNET/resnet/onet", global_step=epoch*8)
+				print ("---------------------------------->")
+				saver.save(sess, "E:/ExtractionNet/ckpt/onet/onet1024_1", global_step=epoch)
 				writer.add_summary(summary,global_step=step)
 	except tf.errors.OutOfRangeError:
 		print("完成！！！")
@@ -189,10 +197,10 @@ def train(net, tfrecord_file, image_size, base_lr, num, end_epoch):
 	sess.close()
 
 if __name__ == '__main__':
-	tfrecord_file = "C:/Users/salaslyrin/Desktop/ResNet/_MYRESNET/train.tfrecord_shuffle"
+	tfrecord_file = "E:/gen_TFRecord/train_1024_test.tfrecord"
 	image_size = 96
-	base_lr = 0.1
-	num = 31000
-	end_epoch = 200
+	base_lr = 0.01
+	num = 126
+	end_epoch = config.LR_EPOCH
 	net = test_net
 	train( net, tfrecord_file, image_size, base_lr, num, end_epoch)
